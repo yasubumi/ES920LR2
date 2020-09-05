@@ -1,6 +1,6 @@
 /*
  * ES920LR2で通信するテスト
- * PinはArduino Nano Everyを前提に設定している。
+ * PinはArduino Nano Everyを前提に設定。
  * 
  */
 
@@ -15,7 +15,7 @@
 #define SLEEP_UART_WAKEUP         5
 
 // 帯域幅
-#define BW_62.5KHZ  3
+#define BW_62_5KHZ  3
 #define BW_125KHZ   4
 #define BW_250KHZ   5
 #define BW_500KHZ   6
@@ -33,17 +33,31 @@ const int LoRa_Rst = 3; // LoRaのResetと接続するPIN番号(任意:D3)
 // 無線設定
 const int LoRa_BW = BW_125KHZ; // 帯域幅
 const int LoRa_SF = 9; // 拡散率(5~12)
-const int LoRa_Sleep_Mode = SLEEP_NO_SLEEP; // ひとまずスリープモードにはしない
+const int LoRa_Sleep_Mode = SLEEP_NO_SLEEP; // ひとまずスリープモードにはしない設定
 
 const int recv_buf_size = 100; // 受信用バッファサイズ(\r\n\0含む)
+
+/* ---------------
+ * プロトタイプ宣言 (無くても良いがライブラリ化に向けて準備)
+ -----------------*/
+void OpenDrainLow(int in_pin);
+void OpenDrainHiZ(int in_pin);
+
+int LoRa_recv(char *buf);
+int LoRa_send(char *msg);
+void LoRa_reset();
+
+bool sendcmd(char *cmd);
+void set_config(int in_bw, int in_sf, int in_sleep);
+
 
 /* ---------------
  * 自作関数
  -----------------*/
 void OpenDrainLow(int in_pin){
   /*
-   * オープンドレインLOW
-   * PINは外付けトランジスタのベースへ接続。出力をコレクタと接続する。要プルアップ
+   * オープンドレインをLOWにセット
+   * PINは外付けトランジスタのベースへ接続。出力をコレクタと接続する。エミッタはGNDへ。要プルアップ
    * PINのHIGH/LOWと出力のHIGH/LOWが逆転する。
    */
    digitalWrite(in_pin, HIGH);
@@ -51,7 +65,7 @@ void OpenDrainLow(int in_pin){
 
 void OpenDrainHiZ(int in_pin){
   /*
-   * オープンドレインHIGH
+   * オープンドレインをHIGHにセット
    * LOWと同様
    */
   digitalWrite(in_pin, LOW);
@@ -147,6 +161,7 @@ void set_config(int in_bw, int in_sf, int in_sleep){
 
   // Modeはプロセッサモード:2を選択
   sendcmd("2\r\n");
+
   // 帯域幅設定
   sprintf(buf, "bw %d\r\n", in_bw);
   sendcmd(buf);
@@ -165,6 +180,7 @@ void set_config(int in_bw, int in_sf, int in_sleep){
   Serial.println("LoRa module set to new mode");
   delay(500);
 }
+
 /*-----------------
  * メイン処理 
  ------------------*/
@@ -182,6 +198,10 @@ void setup() {
 
   pinMode(LoRa_Rst, OUTPUT); // リセット用PINをOUTPUTに設定。
 
+  pinMode(LoRa_Sleep, OUTPUT); // スリープ割り込み用PINをOUTPUTに設定。
+  digitalWrite(LoRa_Sleep, HIGH); // スリープ割り込みピンをHIGHに設定
+
+  // 無線機リセット
   LoRa_reset();
   // 無線からの情報を読み込み
   while(Serial1.available()>0){
@@ -193,7 +213,15 @@ void setup() {
   Serial.println("");
   Serial.println("Init Finished");
 
+  /* 起動した時のモードがコンフィグモードだった場合の処理をここに記載すること。
+   * 具体的には、プロセッサモード選択後にコンフィグを実施してオペレーションモードへ移行する。
+   * 起動時にオペレーションモードだった場合はコマンドが文字列として出力される。
+   * この場合は最初に電波出るけど平気だろうか？何かしら対策入れておく必要あるかも。
+   * 例えばTXモードで受信のみをデフォにしておいて、電波を出すときに切り替えるとか。
+  */
+
   // 無線設定
+  Serial.println("Setting Start");
   set_config(LoRa_BW, LoRa_SF, LoRa_Sleep_Mode);
 
 }
