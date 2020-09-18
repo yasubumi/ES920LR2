@@ -81,7 +81,7 @@ int LoRa_recv(char *buf){
   while(true){
     delay(0);
     while(Serial1.available() > 0){
-      *buf++ = Serial.read();
+      *buf++ = Serial1.read();
       if(icount>=2){
         if(*(buf-2) == '\r' && *(buf-1) == '\n'){
           *buf = '\0';
