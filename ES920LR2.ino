@@ -78,6 +78,7 @@ int LoRa_recv(char *buf){
   char *start = buf;
   int icount = 0;
 
+  Serial.println("LoRa_recv()"); // デバッグプリント
   while(true){
     delay(0);
     while(Serial1.available() > 0){
@@ -135,10 +136,10 @@ void LoRa_reset(){
   /*
    * LoRaをリセットする
    */
+   Serial.println("LoRa_reset()"); // デバッグプリント
    OpenDrainLow(LoRa_Rst);
    delay(100);
    OpenDrainHiZ(LoRa_Rst);
-   delay(1000);
 }
 
 void set_config(int in_bw, int in_sf, int in_sleep){
@@ -188,9 +189,8 @@ void setup() {
   /*
    * 初期化処理
    */
-
-  Serial.begin(9600);
-  delay(20);
+  char buf[recv_buf_size];
+  Serial.begin(115200);
 
   // 無線と接続する為の初期化。
   Serial1.begin(115200);
@@ -204,12 +204,9 @@ void setup() {
   // 無線機リセット
   LoRa_reset();
   // 無線からの情報を読み込み
-  while(Serial1.available()>0){
-    char c = Serial1.read();
-    if(c < 0x80){
-      Serial.print(c);
-    }
-  }
+  LoRa_recv(buf);
+  Serial.print(buf);
+
   Serial.println("");
   Serial.println("Init Finished");
 
@@ -221,12 +218,16 @@ void setup() {
   */
 
   // 無線設定
-  Serial.println("Setting Start");
-  set_config(LoRa_BW, LoRa_SF, LoRa_Sleep_Mode);
+  //Serial.println("Setting Start");
+  //set_config(LoRa_BW, LoRa_SF, LoRa_Sleep_Mode);
 
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  // 無線機リセットと受信のループ
+  Serial.println("受信");
+  LoRa_reset();
+  LoRa_recv(buf);
+  Serial.print(buf);
 
 }
