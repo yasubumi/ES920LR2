@@ -34,8 +34,9 @@ const int LoRa_Rst = 3; // LoRaのResetと接続するPIN番号(任意:D3)
 const int LoRa_BW = BW_125KHZ; // 帯域幅
 const int LoRa_SF = 9; // 拡散率(5~12)
 const int LoRa_Sleep_Mode = SLEEP_NO_SLEEP; // ひとまずスリープモードにはしない設定
+//const int LoRa_Sleep_Mode = SLEEP_INT_WAKEUP_CONTINUE;
 
-const int recv_buf_size = 100; // 受信用バッファサイズ(\r\n\0含む)
+const int recv_buf_size = 64; // 受信用バッファサイズ(\r\n\0含む)
 
 /* ---------------
  * プロトタイプ宣言 (無くても良いがライブラリ化に向けて準備)
@@ -54,33 +55,16 @@ void set_config(int in_bw, int in_sf, int in_sleep);
 /* ---------------
  * 自作関数
  -----------------*/
-void OpenDrainLow(int in_pin){
-  /*
-   * オープンドレインをLOWにセット
-   * PINは外付けトランジスタのベースへ接続。出力をコレクタと接続する。エミッタはGNDへ。要プルアップ
-   * PINのHIGH/LOWと出力のHIGH/LOWが逆転する。
-   */
-   digitalWrite(in_pin, HIGH);
-}
-
-void OpenDrainHiZ(int in_pin){
-  /*
-   * オープンドレインをHIGHにセット
-   * LOWと同様
-   */
-  digitalWrite(in_pin, LOW);
-}
-
 int LoRa_recv(char *buf){
   /*
    * LoRaから受信。戻り値は受信文字数。
    */
   char *start = buf;
   int icount = 0;
+  int itimeout = 0;
 
-  Serial.println("LoRa_recv()"); // デバッグプリント
   while(true){
-    delay(0);
+    delay(1);
     while(Serial1.available() > 0){
       *buf++ = Serial1.read();
       if(icount>=2){
@@ -91,9 +75,15 @@ int LoRa_recv(char *buf){
       }
       icount++;
       if(icount>=recv_buf_size-1){
-        Serial.println("受信文字数上限超過エラー LoRa_recv()");// 受信文字数上限超過エラー
-        return 0;
+        //Serial.println("受信文字数上限超過エラー LoRa_recv()");// 受信文字数上限超過エラー
+        return -1;
       }
+    }
+    // timeout処理
+    itimeout++;
+    if(itimeout >10000){
+      //Serial.println("LoRa_recve() timeout");
+      return -2;
     }
   }
 }
@@ -137,9 +127,9 @@ void LoRa_reset(){
    * LoRaをリセットする
    */
    Serial.println("LoRa_reset()"); // デバッグプリント
-   OpenDrainLow(LoRa_Rst);
+   digitalWrite(LoRa_Rst, LOW);
    delay(100);
-   OpenDrainHiZ(LoRa_Rst);
+   digitalWrite(LoRa_Rst, HIGH);
 }
 
 void set_config(int in_bw, int in_sf, int in_sleep){
@@ -150,6 +140,7 @@ void set_config(int in_bw, int in_sf, int in_sleep){
   LoRa_send("config\r\n");
   delay(200);
   LoRa_reset();
+  delay(1500);
 
   // LoRaから"Select Mode"を受信するまで待機
   while(true){
@@ -163,6 +154,7 @@ void set_config(int in_bw, int in_sf, int in_sleep){
   // Modeはプロセッサモード:2を選択
   sendcmd("2\r\n");
 
+  
   // 帯域幅設定
   sprintf(buf, "bw %d\r\n", in_bw);
   sendcmd(buf);
@@ -178,8 +170,28 @@ void set_config(int in_bw, int in_sf, int in_sleep){
   sendcmd("w\r\n");
 
   LoRa_reset();
-  Serial.println("LoRa module set to new mode");
+  Serial.println("LoRa module setting finished");
   delay(500);
+
+  // 通信のテスト
+  Serial.println("send test");
+  char ibuf[recv_buf_size];
+  int res=0;
+  sendcmd("start\r\n");
+  LoRa_send("send test");
+
+  while(true){
+    LoRa_recv(ibuf);
+    if(strstr(ibuf, "OK")){
+      Serial.print(ibuf);
+      break;
+    } else if(strstr(ibuf, "NG")){
+      Serial.print(ibuf);
+      break;
+    }
+  }
+
+  Serial.print("END");
 }
 
 /*-----------------
@@ -194,15 +206,20 @@ void setup() {
 
   // 無線と接続する為の初期化。
   Serial1.begin(115200);
-  delay(20);
+  delay(1000);
 
   pinMode(LoRa_Rst, OUTPUT); // リセット用PINをOUTPUTに設定。
+  digitalWrite(LoRa_Rst, HIGH);
 
   pinMode(LoRa_Sleep, OUTPUT); // スリープ割り込み用PINをOUTPUTに設定。
   digitalWrite(LoRa_Sleep, HIGH); // スリープ割り込みピンをHIGHに設定
+  digitalWrite(LoRa_Sleep, LOW);
+
 
   // 無線機リセット
   LoRa_reset();
+  delay(1000);
+
   // 無線からの情報を読み込み
   LoRa_recv(buf);
   Serial.print(buf);
@@ -218,16 +235,11 @@ void setup() {
   */
 
   // 無線設定
-  //Serial.println("Setting Start");
-  //set_config(LoRa_BW, LoRa_SF, LoRa_Sleep_Mode);
+  Serial.println("Setting Start");
+  set_config(LoRa_BW, LoRa_SF, LoRa_Sleep_Mode);
 
 }
 
 void loop() {
-  // 無線機リセットと受信のループ
-  Serial.println("受信");
-  LoRa_reset();
-  LoRa_recv(buf);
-  Serial.print(buf);
 
 }
