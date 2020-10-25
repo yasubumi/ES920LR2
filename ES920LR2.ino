@@ -27,7 +27,7 @@
 // ピン設定
 const int LoRa_TX = 0; // LoRaのTXと接続するPIN番号 (RX:D0)
 const int LoRa_RX = 1; // LoRaのRXと接続するPIN番号 (TX:D1)
-const int LoRa_Sleep = 2; // LoRaのSleepと接続するPIN番号(任意:D2)
+const int LoRa_power = 2; // LoRaのSleepと接続するPIN番号(任意:D2)
 const int LoRa_Rst = 3; // LoRaのResetと接続するPIN番号(任意:D3)
 
 // 無線設定
@@ -167,7 +167,7 @@ void set_config(int in_bw, int in_sf, int in_sleep){
   // 動作モードをオペレーションモードに設定
   sendcmd("q 2\r\n");
   // EEPROMに設定をセーブ
-  sendcmd("w\r\n");
+  sendcmd("w\r\n"); 
 
   LoRa_reset();
   Serial.println("LoRa module setting finished");
@@ -203,6 +203,9 @@ void setup() {
    */
   char buf[recv_buf_size];
   Serial.begin(115200);
+  
+  pinMode(LoRa_power, OUTPUT); // スリープ割り込み用PINをOUTPUTに設定。
+  digitalWrite(LoRa_power, HIGH); // スリープ割り込みピンをHIGHに設定
 
   // 無線と接続する為の初期化。
   Serial1.begin(115200);
@@ -211,9 +214,6 @@ void setup() {
   pinMode(LoRa_Rst, OUTPUT); // リセット用PINをOUTPUTに設定。
   digitalWrite(LoRa_Rst, HIGH);
 
-  pinMode(LoRa_Sleep, OUTPUT); // スリープ割り込み用PINをOUTPUTに設定。
-  digitalWrite(LoRa_Sleep, HIGH); // スリープ割り込みピンをHIGHに設定
-  digitalWrite(LoRa_Sleep, LOW);
 
 
   // 無線機リセット
